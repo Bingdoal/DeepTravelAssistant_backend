@@ -4,26 +4,26 @@ import { reverseGeocode, LocationInfo } from "./location.service";
 type Category = "menu" | "supermarket" | "attraction";
 
 interface AnalyzeParams {
-  apiKey: string;
-  model: string;
-  text: string;
-  imageBase64: string[];
-  category: Category;
-  location: {
-    lat: number;
-    lng: number;
-  };
+    apiKey: string;
+    model: string;
+    text: string;
+    imageBase64: string[];
+    category: Category;
+    location: {
+        lat: number;
+        lng: number;
+    };
 }
 
 export interface AnalyzeResult {
-  model: string;
-  location: LocationInfo & {
-    lat: number;
-    lng: number;
-  };
-  category: Category;
-  promptUsed: string;
-  content: string;
+    model: string;
+    location: LocationInfo & {
+        lat: number;
+        lng: number;
+    };
+    category: Category;
+    promptUsed: string;
+    content: string;
 }
 
 /**
@@ -31,48 +31,48 @@ export interface AnalyzeResult {
  * （結構上與 OpenAI 的 ChatCompletionContentPart 相容）
  */
 type UserContentPart =
-  | {
-      type: "text";
-      text: string;
+    | {
+        type: "text";
+        text: string;
     }
-  | {
-      type: "image_url";
-      image_url: {
-        url: string;
-        detail?: "auto" | "low" | "high";
-      };
+    | {
+        type: "image_url";
+        image_url: {
+            url: string;
+            detail?: "auto" | "low" | "high";
+        };
     };
 
 const buildSystemPrompt = (category: Category) => {
-  // 根據不同 category 做簡單的角色設定
-  switch (category) {
-    case "menu":
-      return `
+    // 根據不同 category 做簡單的角色設定
+    switch (category) {
+        case "menu":
+            return `
 你是一位餐廳助手。
 請翻譯並解釋菜單內容，包含菜名、食材和烹飪方式等資訊，內容需精簡但具資訊量，並著重於提供旅客實用的建議。
 `.trim();
-    case "supermarket":
-      return `
+        case "supermarket":
+            return `
 你是一位超市與商品助手。
 請解說超市的商品、它們的常見用途，以及相關的文化背景。
 重點是協助旅客判斷是否值得購買，以及買回去後該如何使用。
 `.trim();
-    case "attraction":
-      return `
+        case "attraction":
+            return `
 你是一位旅遊景點導覽助手。
 請解說該景點的歷史、文化背景，以及任何實用的參觀建議。
 `.trim();
-    default:
-      return "You are a helpful travel assistant.";
-  }
+        default:
+            return "You are a helpful travel assistant.";
+    }
 };
 
 const buildUserPrompt = (
-  text: string,
-  category: Category,
-  locInfo: LocationInfo & { lat: number; lng: number }
+    text: string,
+    category: Category,
+    locInfo: LocationInfo & { lat: number; lng: number }
 ) => {
-  return `
+    return `
 使用者目前所在地：
 	•	國家：${locInfo.country}
 	•	地區：${locInfo.region}
@@ -97,96 +97,96 @@ ${text || "(沒有提供文字，主要依靠圖片與定位)"}
  * - 否則預設當作 image/jpeg
  */
 const toDataUrl = (base64: string): string => {
-  if (!base64) return base64;
-  if (base64.startsWith("data:")) {
-    return base64;
-  }
-  return `data:image/jpeg;base64,${base64}`;
+    if (!base64) return base64;
+    if (base64.startsWith("data:")) {
+        return base64;
+    }
+    return `data:image/jpeg;base64,${base64}`;
 };
 
 export const analyzeWithOpenAI = async (
-  params: AnalyzeParams
+    params: AnalyzeParams
 ): Promise<AnalyzeResult> => {
-  const { apiKey, model, text, imageBase64, category, location } = params;
+    const { apiKey, model, text, imageBase64, category, location } = params;
 
-  const client = new OpenAI({ apiKey });
+    const client = new OpenAI({ apiKey });
 
-  // 1. 反查 location
-  const locInfo = await reverseGeocode(location.lat, location.lng);
+    // 1. 反查 location
+    const locInfo = await reverseGeocode(location.lat, location.lng);
 
-  const systemPrompt = buildSystemPrompt(category);
-  const userPrompt = buildUserPrompt(text, category, {
-    ...locInfo,
-    lat: location.lat,
-    lng: location.lng,
-  });
+    const systemPrompt = buildSystemPrompt(category);
+    const userPrompt = buildUserPrompt(text, category, {
+        ...locInfo,
+        lat: location.lat,
+        lng: location.lng,
+    });
 
-  // 2. 準備 messages（支援圖片）
-  const userContent: UserContentPart[] = [];
+    // 2. 準備 messages（支援圖片）
+    const userContent: UserContentPart[] = [];
 
-  // 先放文字
-  userContent.push({
-    type: "text",
-    text: userPrompt,
-  });
+    // 先放文字
+    userContent.push({
+        type: "text",
+        text: userPrompt,
+    });
 
-  // 再放圖片（如果有）
-  // 注意：要使用 vision 功能，你的 model 必須支援（例如 gpt-4.1, gpt-4.1-mini, gpt-4o 系列）
-  if (imageBase64 && imageBase64.length > 0) {
-    for (const base64 of imageBase64) {
-      if (!base64) continue;
+    // 再放圖片（如果有）
+    // 注意：要使用 vision 功能，你的 model 必須支援（例如 gpt-4.1, gpt-4.1-mini, gpt-4o 系列）
+    if (imageBase64 && imageBase64.length > 0) {
+        for (const base64 of imageBase64) {
+            if (!base64) continue;
 
-      userContent.push({
-        type: "image_url",
-        image_url: {
-          url: toDataUrl(base64),
-          detail: "auto",
-        },
-      });
+            userContent.push({
+                type: "image_url",
+                image_url: {
+                    url: toDataUrl(base64),
+                    detail: "auto",
+                },
+            });
+        }
     }
-  }
 
-  const chat = await client.chat.completions.create({
-    model,
-    messages: [
-      {
-        role: "system",
-        content: systemPrompt,
-      },
-      {
-        role: "user",
-        // 這裡的型別會被視為 ChatCompletionContentPart[]
-        content: userContent,
-      },
-    ],
-  });
+    const chat = await client.chat.completions.create({
+        model,
+        messages: [
+            {
+                role: "system",
+                content: systemPrompt,
+            },
+            {
+                role: "user",
+                // 這裡的型別會被視為 ChatCompletionContentPart[]
+                content: userContent,
+            },
+        ],
+    });
 
-  // 3. 把回傳內容整理成純文字（兼容 string 與 array 兩種情況）
-  const rawContent = chat.choices[0]?.message?.content as
-    | string
-    | Array<{ type: string; text?: string }>
-    | undefined;
+    // 3. 把回傳內容整理成純文字（兼容 string 與 array 兩種情況）
+    const rawContent = chat.choices[0]?.message?.content as
+        | string
+        | Array<{ type: string; text?: string }>
+        | undefined;
 
-  let contentText = "";
+    let contentText = "";
 
-  if (typeof rawContent === "string") {
-    contentText = rawContent;
-  } else if (Array.isArray(rawContent)) {
-    contentText = rawContent
-      .map((part) => (part.type === "text" ? part.text ?? "" : ""))
-      .join("\n")
-      .trim();
-  }
+    if (typeof rawContent === "string") {
+        contentText = rawContent;
+    } else if (Array.isArray(rawContent)) {
+        contentText = rawContent
+            .map((part) => (part.type === "text" ? part.text ?? "" : ""))
+            .join("\n")
+            .trim();
+    }
 
-  return {
-    model,
-    location: {
-      ...locInfo,
-      lat: location.lat,
-      lng: location.lng,
-    },
-    category,
-    promptUsed: userPrompt,
-    content: contentText,
-  };
+    return {
+        model,
+        location: {
+            ...locInfo,
+            lat: location.lat,
+            lng: location.lng,
+        },
+        category,
+        promptUsed: userPrompt,
+        content: contentText,
+    };
 };
